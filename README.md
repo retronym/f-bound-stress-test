@@ -12,6 +12,7 @@ loudly and early.
 |---|--------|-------------------|
 | 1 | Deep single-parameter F-bound chain (`L0`…`L8`) | Signature-attribute depth; naive recursive parsers can blow up quadratically |
 | 2 | Mutually-constrained F-bounds (`Carrier<A, B>`) | Two type parameters referencing each other through their bounds |
+| 2b | Mutually recursive type params across constructors (`Yin`/`Yang`) + single-signature mutual bound (`mutualCompare`) | A 2-cycle in the bound graph through generic types; a bare variable cycle is illegal, this isn't |
 | 3 | Wildcard capture inside an F-bound | `<T extends Comparable<? super T>>` signature explosion |
 | 4 | Covariant-override bridge proliferation | One synthetic bridge method per level of a covariant-return chain |
 | 5 | Raw / generic mixed inheritance | Erased supertype + unchecked bridge logic |

@@ -130,6 +130,37 @@ final class RightNode implements Carrier<RightNode, LeftNode> {
 }
 
 // ---------------------------------------------------------------------------
+// 2b. Mutually recursive type parameters across two type constructors.
+//     Type *variables* can't cycle directly (`<A extends B, B extends A>` is
+//     rejected), but they CAN be mutually recursive *through* generic types:
+//     each interface's parameters are bounded by the other interface, and each
+//     is additionally F-bounded on itself. The bound graph has a 2-cycle
+//     (Yin <-> Yang) that a naive bound-resolver must break.
+// ---------------------------------------------------------------------------
+
+interface Yin<Y extends Yin<Y, Z>, Z extends Yang<Z, Y>> {
+    Z yang();   // crosses to the other constructor
+    Y self();   // F-bound on this one
+}
+
+interface Yang<Z extends Yang<Z, Y>, Y extends Yin<Y, Z>> {
+    Y yin();
+    Z self();
+}
+
+@Stress(note = "mutually recursive type params (yin)")
+final class ConcYin implements Yin<ConcYin, ConcYang> {
+    @Override public ConcYang yang() { return new ConcYang(); }
+    @Override public ConcYin  self() { return this; }
+}
+
+@Stress(note = "mutually recursive type params (yang)")
+final class ConcYang implements Yang<ConcYang, ConcYin> {
+    @Override public ConcYin  yin()  { return new ConcYin(); }
+    @Override public ConcYang self() { return this; }
+}
+
+// ---------------------------------------------------------------------------
 // 3. Wildcard capture inside F-bound + Comparable
 //    Signature explosion: <T:Ljava/lang/Comparable<-TT;>;>
 // ---------------------------------------------------------------------------
@@ -254,6 +285,17 @@ final class DiamondBottom implements DiamondLeft, DiamondRight {
 final class Utilities {
 
     /**
+     * Mutually recursive type parameters within a single method signature:
+     * A is bounded by Comparable&lt;B&gt; and B by Comparable&lt;A&gt;. Legal because the
+     * recursion passes through Comparable rather than being a bare variable cycle.
+     * The method Signature attribute encodes both bounds referencing each other.
+     */
+    public static <A extends Comparable<B>, B extends Comparable<A>>
+    int mutualCompare(A a, B b) {
+        return a.compareTo(b) - b.compareTo(a);
+    }
+
+    /**
      * A method whose type parameter has two independent upper bounds (produces &-separator
      * in the Signature attribute) plus a checked exception.
      */
@@ -328,6 +370,8 @@ public class FBoundedStress {
         // Walk the L0 <-> Mirror signature cycle one full lap at runtime.
         System.out.println("Cycle lap       : " + new Leaf().companion().origin().companion().pivot().depth());
         System.out.println("Carrier mutual  : " + new LeftNode().right().left().getClass().getSimpleName());
+        System.out.println("Yin/Yang        : " + new ConcYin().yang().yin().getClass().getSimpleName());
+        System.out.println("mutualCompare   : " + Utilities.mutualCompare("a", "b"));
         System.out.println("WildInt cmp     : " + new WildInt(1).compareTo(new WildInt(2)));
         System.out.println("Tip produce     : " + new Tip().produce().getClass().getSimpleName());
         System.out.println("Diamond name    : " + new DiamondBottom().name());

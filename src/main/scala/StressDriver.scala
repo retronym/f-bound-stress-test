@@ -17,6 +17,12 @@ object StressDriver:
     val left: Carrier[LeftNode, RightNode] = new LeftNode
     println(s"carrier mutual    : ${left.right().left().getClass.getSimpleName}")
 
+    // Mutually recursive type params across two constructors (Yin <-> Yang).
+    val yin: Yin[ConcYin, ConcYang] = new ConcYin
+    println(s"yin/yang          : ${yin.yang().yin().getClass.getSimpleName}")
+    // Mutual bound within one method signature: A <: Comparable[B], B <: Comparable[A].
+    println(s"mutual compare    : ${Utilities.mutualCompare("a", "b")}")
+
     // Wildcard-in-F-bound + covariant bridge.
     val wi: WildStress[Integer] = new WildInt(1)
     println(s"wildint compare   : ${wi.compareTo(new WildInt(2))}")
