@@ -9,6 +9,10 @@ object StressDriver:
     val leaf: L8[Leaf] = new Leaf
     println(s"leaf depth        : ${leaf.depth()}")
 
+    // Force Zinc to extract the L0 <-> Mirror signature cycle, then walk it.
+    val mirror: Mirror[Leaf] = leaf.companion()
+    println(s"cycle lap         : ${mirror.origin().companion().pivot().depth()}")
+
     // Mutually-constrained F-bounds.
     val left: Carrier[LeftNode, RightNode] = new LeftNode
     println(s"carrier mutual    : ${left.right().left().getClass.getSimpleName}")

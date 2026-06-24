@@ -41,7 +41,21 @@ import java.lang.annotation.*;
 
 interface L0<T extends L0<T>> {
     T self();
+
+    // Signature cycle through method return types. `companion()` names Mirror,
+    // and Mirror.origin() names L0 again — so following method signatures without
+    // memoizing visited types loops forever:
+    //   L0.companion -> Mirror<T> -> Mirror.origin -> L0<T> -> L0.companion -> ...
+    Mirror<T> companion();
+
     default int depth() { return 0; }
+}
+
+// The other half of the cycle: every method here references back to L0 (the
+// first/parent type of the chain), closing the loop a naive parser would chase.
+interface Mirror<T extends L0<T>> {
+    L0<T> origin();
+    T     pivot();
 }
 
 interface L1<T extends L1<T>> extends L0<T> {
@@ -82,6 +96,15 @@ interface L8<T extends L8<T>> extends L7<T> {
 @Stress(note = "deep single-param F-bound leaf")
 final class Leaf implements L8<Leaf> {
     @Override public Leaf self() { return this; }
+
+    // Closes the L0 <-> Mirror signature cycle for the concrete leaf. The
+    // anonymous Mirror also adds another InnerClasses entry to chew on.
+    @Override public Mirror<Leaf> companion() {
+        return new Mirror<Leaf>() {
+            @Override public L0<Leaf> origin() { return Leaf.this; }
+            @Override public Leaf     pivot()  { return Leaf.this; }
+        };
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -283,6 +306,15 @@ enum Transformer implements L0<Transformer> {
     };
 
     public abstract <T> T apply(T x);
+
+    // Shared (non-abstract) — satisfies L0.companion() for every enum constant
+    // and re-enters the L0 <-> Mirror signature cycle.
+    @Override public Mirror<Transformer> companion() {
+        return new Mirror<Transformer>() {
+            @Override public L0<Transformer> origin() { return Transformer.this; }
+            @Override public Transformer     pivot()  { return Transformer.this; }
+        };
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -293,6 +325,8 @@ public class FBoundedStress {
     public static void main(String[] args) throws Exception {
         // Force class initialization (also ensures the class files are all valid)
         System.out.println("Leaf depth      : " + new Leaf().depth());
+        // Walk the L0 <-> Mirror signature cycle one full lap at runtime.
+        System.out.println("Cycle lap       : " + new Leaf().companion().origin().companion().pivot().depth());
         System.out.println("Carrier mutual  : " + new LeftNode().right().left().getClass().getSimpleName());
         System.out.println("WildInt cmp     : " + new WildInt(1).compareTo(new WildInt(2)));
         System.out.println("Tip produce     : " + new Tip().produce().getClass().getSimpleName());
